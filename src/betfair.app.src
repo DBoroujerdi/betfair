@@ -1,0 +1,23 @@
+{application, betfair,
+ [{description, "An OTP application"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, {betfair_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    sasl,
+    inets,
+    ssl,
+    hackney,
+    gproc,
+    jobs,
+    lager,
+    gun
+   ]},
+  {env,[]},
+  {modules, []},
+  {contributors, []},
+  {licenses, []},
+  {links, []}
+ ]}.
