@@ -71,7 +71,7 @@ init([Opts]) ->
                        #{transport => ssl, transport_opts => SslOpts}),
 
     %% {ok, #state{credentials=Credentials, keep_alive = 10000}}.
-    {ok, #state{credentials=maps:from_list(Credentials), keep_alive = 1000 * 60 * 60 * 60}}.
+    {ok, #state{credentials=maps:from_list(Credentials), keep_alive = 1000 * 60 * 60}}.
 
 
 handle_call(token, _From, #state{token=Token} = State) ->
