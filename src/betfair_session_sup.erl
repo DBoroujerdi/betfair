@@ -3,7 +3,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0]).
+-export([start_link/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -14,18 +14,18 @@
 %% API functions
 %%====================================================================
 
-start_link() ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+start_link(Opts) ->
+    supervisor:start_link({local, ?SERVER}, ?MODULE, [Opts]).
 
 
 %%====================================================================
 %% Supervisor callbacks
 %%====================================================================
 
-init([]) ->
+init([Opts]) ->
     {ok, {{one_for_all, 1, 5}, [
-                                betfair_sup:worker(betfair_session, permanent, []),
-                                betfair_sup:supervisor(betfair_connection_sup, permanent, [])
+                                betfair_sup:worker(betfair_session, permanent, [Opts]),
+                                betfair_sup:supervisor(betfair_connection_sup, permanent, [Opts])
                                ]}}.
 
 

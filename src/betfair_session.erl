@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/1]).
 -export([login/0]).
 -export([get_token/0]).
 -export([update_token/1]).
@@ -24,18 +24,23 @@
 
 -type token() :: string().
 
+-export_type([credentials/0]).
 -export_type([token/0]).
 
 -record(state, {credentials::betfair:credentials(),
                 connection, token, keep_alive}).
+
+-type credentials() :: #{username => string(),
+                         password => string(),
+                         app_key=> string()}.
 
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], [{debug, [trace, log]}]).
+start_link(Opts) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [Opts], []).
 
 login() ->
     gen_server:call(?MODULE, login).
@@ -51,18 +56,19 @@ update_token(Token) ->
 %%% gen_server callbacks
 %%%===================================================================
 
-init([]) ->
+init([Opts]) ->
     lager:info("Starting new session"),
-    {ok, Credentials} = betfair:get_credentials(),
+    Credentials = proplists:get_value(credentials, Opts),
     lager:info("Credentials: ~p~n", [Credentials]),
-    {ok, SslOpts} = betfair:get_ssl_opts(),
+
+    SslOpts = proplists:get_value(ssl, Opts),
 
     lager:info("Connecting with ssl opts ~p~n", [SslOpts]),
     {ok, _} = gun:open("identitysso.betfair.com", 443,
                        #{transport => ssl, transport_opts => SslOpts}),
 
     %% {ok, #state{credentials=Credentials, keep_alive = 10000}}.
-    {ok, #state{credentials=Credentials, keep_alive = 1000 * 60 * 60 * 60}}.
+    {ok, #state{credentials=maps:from_list(Credentials), keep_alive = 1000 * 60 * 60 * 60}}.
 
 
 handle_call(token, _From, #state{token=Token} = State) ->
@@ -132,8 +138,6 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-%% TODO these look generic - maybe use elsewhere?
 
 receive_response(Self, Stream, Connection, Handler) ->
     receive
