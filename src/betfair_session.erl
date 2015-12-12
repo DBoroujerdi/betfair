@@ -96,13 +96,11 @@ handle_info({token, Token}, State) ->
     lager:info("Updating with first token with ~p", [Token]),
     gproc_ps:publish(?SCOPE, session_token, Token),
     {noreply, State#state{token=Token}};
-handle_info(keep_alive, #state{token=Token, connection=Connection,
-                               credentials=Credentials} = State) ->
+handle_info(keep_alive, #state{token=Token, connection=Connection} = State) ->
     _ = lager:info("Keeping session ~p alive..", [Token]),
 
-    #{app_key := Appkey} = Credentials,
-    Headers = [{<<"Content-Type">>, "application/json"},
-                  {<<"X-Application">>, Appkey},
+    Headers = [{<<"Accept">>, "application/json"},
+                  {<<"X-Application">>, <<"AppKey">>},
                   {<<"X-Authentication">>, Token}],
 
     Stream = gun:get(Connection, "/api/keepAlive", Headers),
