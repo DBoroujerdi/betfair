@@ -7,7 +7,7 @@
 -export([login/0]).
 -export([get_token/0]).
 -export([update_token/1]).
-
+-export([keep_alive/0]).
 
 %% gen_server callbacks
 -export([
@@ -50,6 +50,9 @@ get_token() ->
 
 update_token(Token) ->
     gen_server:cast(?MODULE, {token, Token}).
+
+keep_alive() ->
+    betfair_session ! keep_alive.
 
 
 %%%===================================================================
