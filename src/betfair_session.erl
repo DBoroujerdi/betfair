@@ -4,10 +4,7 @@
 
 %% API
 -export([start_link/1]).
--export([login/0]).
 -export([get_token/0]).
--export([update_token/1]).
--export([keep_alive/0]).
 
 %% gen_server callbacks
 -export([
@@ -42,17 +39,8 @@
 start_link(Opts) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [Opts], []).
 
-login() ->
-    gen_server:call(?MODULE, login).
-
 get_token() ->
     gen_server:call(?MODULE, token).
-
-update_token(Token) ->
-    gen_server:cast(?MODULE, {token, Token}).
-
-keep_alive() ->
-    betfair_session ! keep_alive.
 
 
 %%%===================================================================
@@ -67,63 +55,62 @@ init([Opts]) ->
     SslOpts = proplists:get_value(ssl, Opts),
 
     lager:info("Connecting with ssl opts ~p~n", [SslOpts]),
-    {ok, _} = gun:open("identitysso.betfair.com", 443,
-                       #{transport => ssl, transport_opts => SslOpts}),
+    {ok, Connection} = gun:open("identitysso.betfair.com", 443,
+                                #{transport => ssl, transport_opts => SslOpts}),
+    {ok, _} = gun:await_up(Connection),
 
-    %% {ok, #state{credentials=Credentials, keep_alive = 10000}}.
-    {ok, #state{credentials=maps:from_list(Credentials), keep_alive = 1000 * 60 * 60}}.
+    KeepAlive = get_keep_alive(Opts),
+    _ = keep_alive(KeepAlive),
 
-
-handle_call(token, _From, #state{token=Token} = State) ->
-    {reply, Token, State};
-handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
-
-handle_cast({token, Token}, State) ->
-    lager:info("Updating token with ~p", [Token]),
-
-    {noreply, State#state{token=Token}};
-handle_cast(_Msg, State) ->
-    {noreply, State}.
+    {ok, #state{credentials = maps:from_list(Credentials),
+                keep_alive = KeepAlive,
+                connection = Connection}}.
 
 
-handle_info({token, Token}, #state{token=Token} = State) when is_binary(Token) ->
-    lager:info("Updating with token ~p", [Token]),
-    gproc_ps:publish(?SCOPE, session_token, Token),
-    {noreply, State#state{token=Token}};
-handle_info({token, Token}, State) ->
-    lager:info("Updating with first token with ~p", [Token]),
-    gproc_ps:publish(?SCOPE, session_token, Token),
-    {noreply, State#state{token=Token}};
-handle_info(keep_alive, #state{token=Token, connection=Connection} = State) ->
-    _ = lager:info("Keeping session ~p alive..", [Token]),
-
-    Headers = [{<<"Accept">>, "application/json"},
-                  {<<"X-Application">>, <<"AppKey">>},
-                  {<<"X-Authentication">>, Token}],
-
-    Stream = gun:get(Connection, "/api/keepAlive", Headers),
-    _ = receive_response(self(), Stream, Connection, fun keep_alive_handler/1),
-    _ = keep_alive(State#state.keep_alive),
-    {noreply, State};
-handle_info(login, #state{credentials=Credentials,
-                          connection=Connection} = State) ->
+handle_call(token, _From, #state{credentials=Credentials,
+                                 connection=Connection} = State) ->
     #{app_key := Appkey} = Credentials,
-    lager:info("Logging in"),
+    lager:info("Logging in .."),
     ReqBody = betfair_http:url_encode(maps:without([app_key], Credentials)),
     ReqHeaders = [{<<"Content-Type">>, "application/x-www-form-urlencoded"},
                   {<<"X-Application">>, Appkey}],
     Stream = gun:post(Connection, "/api/certlogin", ReqHeaders, ReqBody),
-    _ = receive_response(self(), Stream, Connection, fun login_handler/1),
-    _ = keep_alive(State#state.keep_alive),
-    {noreply, State};
-handle_info({gun_up, Connection, _Transport}, State) ->
-    lager:info("Connection established .."),
-    self() ! login,
-    {noreply, State#state{connection = Connection}};
-handle_info({gun_response, _Connection, _StreamRef, nofin, _Status, _}, State) ->
-    lager:info("Headers received .."),
+
+    Reply = case gun:await(Connection, Stream) of
+                {response, fin, _Status, _Headers} ->
+                    {error, no_data};
+                {response, nofin, _Status, _Headers} ->
+                    {ok, Body} = gun:await_body(Connection, Stream),
+                    Response = jsx:decode(Body, [return_maps, {labels, atom}]),
+                    token(Response)
+            end,
+    {reply, {ok, Reply}, update_state(Reply, State)};
+handle_call(_Request, _From, State) ->
+    Reply = ok,
+    {reply, Reply, State}.
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info(keep_alive, #state{token=Token,
+                               connection=Connection,
+                               keep_alive=Interval} = State) ->
+    _ = lager:info("Keeping session ~p alive..", [Token]),
+
+    Headers = [{<<"Accept">>, "application/json"},
+               {<<"X-Application">>, <<"AppKey">>},
+               {<<"X-Authentication">>, Token}],
+
+    Stream = gun:get(Connection, "/api/keepAlive", Headers),
+    {ok, Token} = case gun:await(Connection, Stream) of
+                      {response, fin, _Status, _Headers} ->
+                          {error, no_data};
+                      {response, nofin, _Status, _Headers} ->
+                          {ok, Body} = gun:await_body(Connection, Stream),
+                          Response = jsx:decode(Body, [return_maps, {labels, atom}]),
+                          token(Response)
+                  end,
+    _ = keep_alive(Interval),
     {noreply, State};
 handle_info(Info, State) ->
     lager:warning("Unexpected message ~p", [Info]),
@@ -140,46 +127,27 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-receive_response(Self, Stream, Connection, Handler) ->
-    receive
-        {gun_response, Connection, Stream, fin, _Status, _Headers} ->
-            no_data;
-        {gun_response, Connection, Stream, nofin, _Status, _Headers} ->
-            %% TODO only receive if 200 status?
-            receive_data(Self, Connection, Stream, Handler);
-        {'DOWN', _, process, Connection, Reason} ->
-            error_logger:error_msg("Oops!"),
-            exit(Reason)
-    after 1000 ->
-            exit(timeout)
-    end.
+update_state({ok, Token}, State) ->
+    State#state{token = Token};
+update_state(_, State) ->
+    State.
 
-receive_data(Self, Connection, Stream, Handler) ->
-    receive
-        {gun_data, _Connection, _Stream, nofin, _Data} ->
-            receive_data(Self, Connection, Stream, Handler);
-        {gun_data, _Connection, Stream, fin, Data} ->
-            lager:info("Received Data ~p", [Data]),
-            Response = jsx:decode(Data, [return_maps, {labels, atom}]),
-            Self ! Handler(Response);
-        {'DOWN', _, process, _Connection, Reason} ->
-            _ = lager:error("Oops!"),
-            exit(Reason)
-    after 1000 ->
-            exit(timeout)
-    end.
+token(#{sessionToken := Token, loginStatus := _Reason}) ->
+    {ok, Token};
+token(#{token := Token, status := <<"SUCCESS">>}) ->
+    {ok, Token};
+token(#{loginStatus := Reason}) ->
+    {error, Reason};
+token(#{error := Reason}) ->
+    {error, Reason}.
 
 
-login_handler(#{sessionToken := Token, loginStatus := _Reason}) ->
-    {token, Token};
-login_handler(#{loginStatus := Reason}) ->
-    exit(Reason).
+keep_alive(Interval) ->
+    erlang:send_after(Interval, self(), keep_alive).
 
-keep_alive_handler(#{token := Token, status := <<"SUCCESS">>}) ->
-    {token, Token};
-keep_alive_handler(#{status := <<"SUCCESS">>, error := Reason}) ->
-    exit(Reason).
+get_keep_alive(Opts) ->
+    KeepAlive = proplists:get_value(keep_alive, Opts),
+    keep_alive_millis(KeepAlive).
 
-
-keep_alive(KeepAliveInterval) ->
-    erlang:send_after(KeepAliveInterval, self(), keep_alive).
+keep_alive_millis(KeepAliveHours) ->
+    (1000 * 60 * 60) * KeepAliveHours.

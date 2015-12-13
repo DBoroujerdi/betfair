@@ -24,8 +24,7 @@ start_link(Opts) ->
 
 init([Opts]) ->
     {ok, {{one_for_all, 1, 5}, [
-                                betfair_sup:worker(betfair_session, permanent, [Opts]),
-                                betfair_sup:supervisor(betfair_connection_sup, permanent, [Opts])
+                                betfair_sup:worker(betfair_session, permanent, [Opts])
                                ]}}.
 
 

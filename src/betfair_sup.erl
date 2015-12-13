@@ -33,8 +33,10 @@ start_link(Opts) ->
 %%====================================================================
 
 init([Opts]) ->
-    {ok, {{one_for_all, 1, 5}, [
-                                supervisor(betfair_session_sup, permanent, [Opts])
+    {ok, {{one_for_one, 1, 5}, [
+                                supervisor(betfair_session_sup, permanent, [Opts]),
+                                supervisor(betfair_response_processor_sup, permanent, [Opts]),
+                                worker(betfair, permanent, [Opts])
                                ]}}.
 
 

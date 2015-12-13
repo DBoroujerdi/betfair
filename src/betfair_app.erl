@@ -31,6 +31,8 @@ stop(_) ->
 %% Internal functions
 %%====================================================================
 
+check_options([{keep_alive, KeepAlive}|Rest]) when is_number(KeepAlive) ->
+    check_options(Rest);
 check_options([{num_conns, NumCons}|Rest]) when is_number(NumCons) ->
     check_options(Rest);
 check_options([{ssl, SslOpts}|Rest]) when is_list(SslOpts) ->

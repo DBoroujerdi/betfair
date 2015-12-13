@@ -1,4 +1,4 @@
--module(betfair_connection).
+-module(betfair_response_processor).
 
 -behaviour(gen_server).
 
@@ -34,7 +34,7 @@ start_link() ->
 %%%===================================================================
 
 init([]) ->
-    gproc_ps:subscribe(?SCOPE, session_token),
+    gproc_ps:subscribe(?SCOPE, betfair_response_data),
     {ok, #state{}}.
 
 handle_call(_Request, _From, State) ->
@@ -44,9 +44,9 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({gproc_ps_event, session_token, SessionToken}, State) ->
-    lager:info("Received session token ~p", [SessionToken]),
-    {noreply, State#state{session_token=SessionToken}};
+handle_info({gproc_ps_event, betfair_response_data, Data}, State) ->
+    lager:info("Received betfair response ~p", [Data]),
+    {noreply, State};
 handle_info(Info, State) ->
     lager:warning("Unexpected message ~p", [Info]),
     {noreply, State}.

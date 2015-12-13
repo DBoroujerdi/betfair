@@ -1,4 +1,4 @@
--module(betfair_connection_sup).
+-module(betfair_response_processor_sup).
 
 -behaviour(supervisor).
 
@@ -24,17 +24,18 @@ start_link(Opts) ->
 %%%===================================================================
 
 init([Opts]) ->
-    NumConn = proplists:get_value(num_conns, Opts),
-    {ok, {{one_for_one, 1, 5}, procs(NumConn)}}.
+    NumProcs = proplists:get_value(num_procs, Opts),
+    {ok, {{one_for_one, 1, 5}, procs(NumProcs)}}.
 
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
 
-procs(NumConnections) ->
-    [proc({betfair_connection, Id}, betfair_connection, permanent, []) ||
-        Id <- lists:seq(1, NumConnections)].
+procs(NumProcs) ->
+    [proc({betfair_response_processor, Id},
+          betfair_response_processor, permanent, []) ||
+        Id <- lists:seq(1, NumProcs)].
 
 proc(Id, Module, Restart, Args) ->
     betfair_sup:worker(Id, Module, Restart, Args).
