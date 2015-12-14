@@ -55,7 +55,8 @@ init([Opts]) ->
     SslOpts = proplists:get_value(ssl, Opts),
 
     lager:info("Connecting with ssl opts ~p~n", [SslOpts]),
-    {ok, Connection} = gun:open("identitysso.betfair.com", 443,
+    IdentityEndpoint = proplists:get_value(identity_endpoint, Opts),
+    {ok, Connection} = gun:open(IdentityEndpoint, 443,
                                 #{transport => ssl, transport_opts => SslOpts}),
     {ok, _} = gun:await_up(Connection),
 

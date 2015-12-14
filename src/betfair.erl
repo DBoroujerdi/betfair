@@ -58,7 +58,8 @@ init([Opts]) ->
     SslOpts = proplists:get_value(ssl, Opts),
 
     lager:info("Connecting to the betfair api with token ~p", [SessionToken]),
-    {ok, Connection} = gun:open("api.betfair.com", 443,
+    ExchangeEndpoint = proplists:get_value(exchange_endpoint, Opts),
+    {ok, Connection} = gun:open(ExchangeEndpoint, 443,
                                #{transport => ssl, transport_opts => SslOpts}),
 
     {ok, _} = gun:await_up(Connection),
