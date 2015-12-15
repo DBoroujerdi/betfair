@@ -1,4 +1,4 @@
-betfair
+bety
 =====
 
 An Erlang/OTP Betfair Client
