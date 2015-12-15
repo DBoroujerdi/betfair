@@ -16,6 +16,11 @@
          code_change/3
         ]).
 
+
+%%--------------------------------------------------------------------
+%% Types & Macros
+%%--------------------------------------------------------------------
+
 -define(SERVER, ?MODULE).
 -define(SCOPE, l).
 
@@ -24,8 +29,10 @@
 -export_type([credentials/0]).
 -export_type([token/0]).
 
--record(state, {credentials::betfair:credentials(),
-                connection, token, keep_alive}).
+-record(state, {credentials :: betfair:credentials(),
+                connection :: pid(),
+                token :: token(),
+                keep_alive :: number()}).
 
 -type credentials() :: #{username => string(),
                          password => string(),
@@ -39,6 +46,7 @@
 start_link(Opts) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [Opts], []).
 
+-spec get_token() -> string().
 get_token() ->
     gen_server:call(?MODULE, token).
 
@@ -48,13 +56,12 @@ get_token() ->
 %%%===================================================================
 
 init([Opts]) ->
-    lager:info("Starting new session"),
     Credentials = proplists:get_value(credentials, Opts),
-    lager:info("Credentials: ~p~n", [Credentials]),
+    _ = lager:info("Credentials: ~p~n", [Credentials]),
 
     SslOpts = proplists:get_value(ssl, Opts),
 
-    lager:info("Connecting with ssl opts ~p~n", [SslOpts]),
+    _ = lager:info("Connecting with ssl opts ~p~n", [SslOpts]),
     IdentityEndpoint = proplists:get_value(identity_endpoint, Opts),
     {ok, Connection} = gun:open(IdentityEndpoint, 443,
                                 #{transport => ssl, transport_opts => SslOpts}),
@@ -71,7 +78,7 @@ init([Opts]) ->
 handle_call(token, _From, #state{credentials=Credentials,
                                  connection=Connection} = State) ->
     #{app_key := Appkey} = Credentials,
-    lager:info("Logging in .."),
+    _ = lager:info("Logging in .."),
     ReqBody = betfair_http:url_encode(maps:without([app_key], Credentials)),
     ReqHeaders = [{<<"Content-Type">>, "application/x-www-form-urlencoded"},
                   {<<"X-Application">>, Appkey}],
@@ -101,7 +108,7 @@ handle_info(keep_alive, #state{token=Token,
     _ = keep_alive(Interval),
     {noreply, State};
 handle_info(Info, State) ->
-    lager:warning("Unexpected message ~p", [Info]),
+    _ = lager:warning("Unexpected message ~p", [Info]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->
@@ -115,6 +122,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+-spec request(pid(), reference()) -> {ok, token()} | any().
 request(Connection, Stream) ->
     case gun:await(Connection, Stream) of
         {response, fin, _Status, _Headers} ->
@@ -125,11 +133,16 @@ request(Connection, Stream) ->
             token(Response)
     end.
 
+-spec update_state(Token, State) -> #state{} when
+      Token :: {ok, token()} | any(),
+      State :: #state{}.
 update_state({ok, Token}, State) ->
     State#state{token = Token};
 update_state(_, State) ->
     State.
 
+
+-spec token(map()) -> {ok, token()} | {error, string()}.
 token(#{sessionToken := Token, loginStatus := _Reason}) ->
     {ok, Token};
 token(#{token := Token, status := <<"SUCCESS">>}) ->
@@ -140,12 +153,16 @@ token(#{error := Reason}) ->
     {error, Reason}.
 
 
+-spec keep_alive(number()) -> reference().
 keep_alive(Interval) ->
     erlang:send_after(Interval, self(), keep_alive).
 
+
+-spec get_keep_alive(list(tuple())) -> number().
 get_keep_alive(Opts) ->
     KeepAlive = proplists:get_value(keep_alive, Opts),
     keep_alive_millis(KeepAlive).
 
+-spec keep_alive_millis(number()) -> number().
 keep_alive_millis(KeepAliveHours) ->
     (1000 * 60 * 60) * KeepAliveHours.
