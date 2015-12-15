@@ -75,16 +75,10 @@ handle_call(token, _From, #state{credentials=Credentials,
     ReqBody = betfair_http:url_encode(maps:without([app_key], Credentials)),
     ReqHeaders = [{<<"Content-Type">>, "application/x-www-form-urlencoded"},
                   {<<"X-Application">>, Appkey}],
-    Stream = gun:post(Connection, "/api/certlogin", ReqHeaders, ReqBody),
 
-    Reply = case gun:await(Connection, Stream) of
-                {response, fin, _Status, _Headers} ->
-                    {error, no_data};
-                {response, nofin, _Status, _Headers} ->
-                    {ok, Body} = gun:await_body(Connection, Stream),
-                    Response = jsx:decode(Body, [return_maps, {labels, atom}]),
-                    token(Response)
-            end,
+    Stream = gun:post(Connection, "/api/certlogin", ReqHeaders, ReqBody),
+    Reply = request(Connection, Stream),
+
     {reply, {ok, Reply}, update_state(Reply, State)};
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -103,14 +97,7 @@ handle_info(keep_alive, #state{token=Token,
                {<<"X-Authentication">>, Token}],
 
     Stream = gun:get(Connection, "/api/keepAlive", Headers),
-    {ok, Token} = case gun:await(Connection, Stream) of
-                      {response, fin, _Status, _Headers} ->
-                          {error, no_data};
-                      {response, nofin, _Status, _Headers} ->
-                          {ok, Body} = gun:await_body(Connection, Stream),
-                          Response = jsx:decode(Body, [return_maps, {labels, atom}]),
-                          token(Response)
-                  end,
+    {ok, Token} = request(Connection, Stream ),
     _ = keep_alive(Interval),
     {noreply, State};
 handle_info(Info, State) ->
@@ -127,6 +114,16 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+request(Connection, Stream) ->
+    case gun:await(Connection, Stream) of
+        {response, fin, _Status, _Headers} ->
+            {error, no_data};
+        {response, nofin, _Status, _Headers} ->
+            {ok, Body} = gun:await_body(Connection, Stream),
+            Response = jsx:decode(Body, [return_maps, {labels, atom}]),
+            token(Response)
+    end.
 
 update_state({ok, Token}, State) ->
     State#state{token = Token};
