@@ -9,9 +9,7 @@
     sasl,
     inets,
     ssl,
-    hackney,
     gproc,
-    jobs,
     lager,
     gun
    ]},

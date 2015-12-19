@@ -5,7 +5,7 @@ PROJECT_VERSION = 0.1.0
 
 COVER = 1
 
-DEPS = gproc jobs poolboy lager hackney jsx gun
+DEPS = lager jsx gun gproc
 TEST_DEPS = meck
 
 DIALYZER_DIRS = ebin
