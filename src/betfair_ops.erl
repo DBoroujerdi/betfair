@@ -17,7 +17,6 @@
 
 
 -spec list_event_types(string(), string()) -> rpc_command().
-
 list_event_types(EventType, Country) ->
     Filter = #{eventTypeIds => [EventType],
                marketCountries => [Country]},
@@ -25,22 +24,19 @@ list_event_types(EventType, Country) ->
     rpc("SportsAPING/v1.0/listEvents", #{params => #{filter => Filter}}).
 
 
-
-
-%%--------------------------------------------------------------------
+%%------------------------------------------------------------------------------
 %% Internal
-%%--------------------------------------------------------------------
+%%------------------------------------------------------------------------------
 
 -spec rpc(command(), filter()) -> rpc_command().
-
 rpc(Method, Filter) ->
     ?BASE_RPC#{method => Method,
                params => #{filter => Filter}}.
 
 
-%%%====================================================================
-%%% Unit tests
-%%%====================================================================
+%%------------------------------------------------------------------------------
+%% Unit Tests
+%%------------------------------------------------------------------------------
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

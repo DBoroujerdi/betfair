@@ -8,15 +8,17 @@
          stop/1
         ]).
 
-%%====================================================================
-%% API
-%%====================================================================
+
+%%------------------------------------------------------------------------------
+%% Api Functions
+%%------------------------------------------------------------------------------
+
 start(_, _) ->
     lager:info("Starting.."),
 
-    Opts = betfair:get_env(),
+    Opts = betfair:get_opts(),
 
-    case check_options(Opts) of
+    case check_opts(Opts) of
         ok ->
             betfair_sup:start_link(Opts);
         Error ->
@@ -27,21 +29,13 @@ stop(_) ->
     ok.
 
 
-%%====================================================================
+%%------------------------------------------------------------------------------
 %% Internal functions
-%%====================================================================
+%%------------------------------------------------------------------------------
 
-check_options([{keep_alive, KeepAlive}|Rest]) when is_number(KeepAlive) ->
-    check_options(Rest);
-check_options([{num_conns, NumCons}|Rest]) when is_number(NumCons) ->
-    check_options(Rest);
-check_options([{ssl, SslOpts}|Rest]) when is_list(SslOpts) ->
-    check_options(Rest);
-check_options([{credentials, Credentials}|Rest]) when is_list(Credentials)  ->
-    check_options(Rest);
-check_options([{_Key, _Value}|Rest]) ->
-    check_options(Rest);
-check_options([]) ->
+check_opts([{num_conns, NumCons}|Rest]) when is_number(NumCons) ->
+    check_opts(Rest);
+check_opts([{_Key, _Value}|Rest]) ->
+    check_opts(Rest);
+check_opts([]) ->
     ok.
-
-%% TODO now actually check each option type

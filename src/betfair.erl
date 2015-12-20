@@ -1,42 +1,24 @@
 -module(betfair).
 
--ifdef(TEST).
--compile([export_all]).
--endif.
-
--behaviour(gen_server).
-
-%% API
--export([start_link/1]).
--export([list_countries/0]).
-
 -export([start/0]).
 -export([make/0]).
--export([get_env/0]).
+-export([get_opts/0]).
+-export([start_session/0]).
+-export([start_session/1]).
+-export([start_connection/0]).
+-export([request/3]).
+-export([request_sync/3]).
 
 -define(SCOPE, l).
 
 
-%% gen_server callbacks
--export([init/1,
-         handle_call/3,
-         handle_cast/2,
-         handle_info/2,
-         terminate/2,
-         code_change/3]).
+%% TODO: api inputs validation!
+%% TODO: Sync requests
 
--define(SERVER, ?MODULE).
 
--record(state, {token, connection}).
-
-%%%===================================================================
-%%% API
-%%%===================================================================
-start_link(Opts) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [Opts], []).
-
-list_countries() ->
-    gen_server:cast(?MODULE, {list_countries, self()}).
+%%------------------------------------------------------------------------------
+%% API
+%%------------------------------------------------------------------------------
 
 make() ->
     make:all([load]).
@@ -44,50 +26,49 @@ make() ->
 start() ->
     application:ensure_all_started(?MODULE).
 
-get_env() ->
+get_opts() ->
     application:get_all_env(betfair).
 
+start_session() ->
+    start_session(get_opts()).
+start_session(Opts) ->
+    betfair_session_sup:start_session(check_opts(Opts)).
 
-%%--------------------------------------------------------------------
-%% gen-server callbacks
-%%--------------------------------------------------------------------
+start_connection() ->
+    betfair_connection_sup:start_connection().
 
-init([Opts]) ->
-    {ok, SessionToken} = betfair_session:get_token(),
+request(Pid, Command, Filter) ->
+    betfair_connection:request(Pid, {Command, Filter}).
 
-    SslOpts = proplists:get_value(ssl, Opts),
-
-    lager:info("Connecting to the betfair api with token ~p", [SessionToken]),
-    ExchangeEndpoint = proplists:get_value(exchange_endpoint, Opts),
-    {ok, Connection} = gun:open(ExchangeEndpoint, 443,
-                               #{transport => ssl, transport_opts => SslOpts}),
-
-    {ok, _} = gun:await_up(Connection),
-
-    {ok, #state{token=SessionToken, connection=Connection}}.
-
-handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
-
-handle_cast({list_countries, _CallerPid},
-            #state{token = _Token, connection = _Connection} = State) ->
-
-    %% TODO
-
-    {noreply, State};
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-terminate(_Reason, _State) ->
+request_sync(_Pid, _Command, _Filter) ->
+    %% TODO:
     ok.
 
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
+%%------------------------------------------------------------------------------
+%% Internal
+%%------------------------------------------------------------------------------
+
+check_opts(Opts) when is_list(Opts) ->
+    check_opts(Opts, Opts).
+
+check_opts(Opts, [{keep_alive, KeepAlive}|Rest]) when is_number(KeepAlive) ->
+    check_opts(Opts, Rest);
+check_opts(Opts, [{num_conns, NumCons}|Rest]) when is_number(NumCons) ->
+    check_opts(Opts, Rest);
+check_opts(Opts, [{ssl, SslOpts}|Rest]) when is_list(SslOpts) ->
+    check_opts(Opts, Rest);
+check_opts(Opts, [{credentials, Credentials}|Rest]) when is_list(Credentials)  ->
+    check_opts(Opts, Rest);
+check_opts(Opts, [{_Key, _Value}|Rest]) ->
+    check_opts(Opts, Rest);
+check_opts(Opts, []) ->
+    Opts.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+%% TODO: test check_opts
+
+-endif
