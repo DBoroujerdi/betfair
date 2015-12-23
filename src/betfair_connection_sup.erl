@@ -4,7 +4,7 @@
 
 %% API
 -export([start_link/2]).
--export([start_connection/0]).
+-export([start_connection/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -19,8 +19,13 @@
 start_link(Opts, Session) when is_binary(Session) ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, [Opts, Session]).
 
-start_connection() ->
-    supervisor:start_child(?SERVER, []).
+start_connection(OwnerPid) when is_pid(OwnerPid) ->
+    case supervisor:start_child(?SERVER, []) of
+        {_, Pid} when is_pid(Pid) ->
+            _ = betfair_connection:set_owner(Pid, OwnerPid);
+        Error ->
+            Error
+    end.
 
 
 %%------------------------------------------------------------------------------
@@ -32,6 +37,7 @@ init([Opts, Session]) ->
                  intensity => 1,
                  period => 5},
     ChildSpecs = [#{id => betfair_connection,
+                    restart => transient,
                     start => {betfair_connection, start_link, [Opts, Session]},
-                    shutdown => brutal_kill}],
+                    shutdown => 5000}],
     {ok, {SupFlags, ChildSpecs}}.

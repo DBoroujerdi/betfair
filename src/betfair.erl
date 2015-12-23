@@ -35,7 +35,7 @@ start_session(Opts) ->
     betfair_session_sup:start_session(check_opts(Opts)).
 
 start_connection() ->
-    betfair_connection_sup:start_connection().
+    betfair_connection_sup:start_connection(self()).
 
 request(Pid, Command, Filter) ->
     betfair_connection:request(Pid, {Command, Filter}).
