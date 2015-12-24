@@ -73,8 +73,8 @@ handle_info({'DOWN', _MRef, process, _ServerPid, _Reason}, State) ->
     {stop, normal, State};
 handle_info(_Info, State) ->
     {noreply, State}.
-terminate(_Reason, _State) ->
-    ok.
+terminate(_Reason, #state{connection=Connection}) ->
+    gun:shutdown(Connection).
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
