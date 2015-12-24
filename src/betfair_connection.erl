@@ -33,6 +33,7 @@ start_link(Opts, SessionToken) ->
 request(Pid, Command) ->
     gen_server:cast(Pid, Command).
 
+-spec set_owner(pid(), pid()) -> {ok, reference()}.
 set_owner(Pid, OwnerPid) ->
     gen_server:call(Pid, {owner_pid, OwnerPid}).
 
@@ -44,7 +45,7 @@ set_owner(Pid, OwnerPid) ->
 init([Opts, Session]) ->
     SslOpts = proplists:get_value(ssl, Opts),
 
-    lager:info("Connecting to the betfair api with token ~p", [Session]),
+    _ = lager:info("Connecting to the betfair api with token ~p", [Session]),
     Endpoint = proplists:get_value(exchange_endpoint, Opts),
     {ok, Connection} = gun:open(Endpoint, 443,
                                 #{transport => ssl, transport_opts => SslOpts}),

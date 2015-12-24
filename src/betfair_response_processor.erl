@@ -46,10 +46,10 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({gproc_ps_event, betfair_response_data, Data}, State) ->
-    lager:info("Received betfair response ~p", [Data]),
+    _ = lager:info("Received betfair response ~p", [Data]),
     {noreply, State};
 handle_info(Info, State) ->
-    lager:warning("Unexpected message ~p", [Info]),
+    _ = lager:warning("Unexpected message ~p", [Info]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->

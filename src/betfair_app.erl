@@ -14,16 +14,10 @@
 %%------------------------------------------------------------------------------
 
 start(_, _) ->
-    lager:info("Starting.."),
-
+    _ = lager:info("Starting.."),
     Opts = betfair:get_opts(),
-
-    case check_opts(Opts) of
-        ok ->
-            betfair_sup:start_link(Opts);
-        Error ->
-            Error
-    end.
+    ok = check_opts(Opts),
+    betfair_sup:start_link(Opts).
 
 stop(_) ->
     ok.
@@ -33,6 +27,7 @@ stop(_) ->
 %% Internal functions
 %%------------------------------------------------------------------------------
 
+-spec check_opts(list(tuple())) -> ok.
 check_opts([{num_conns, NumCons}|Rest]) when is_number(NumCons) ->
     check_opts(Rest);
 check_opts([{_Key, _Value}|Rest]) ->
