@@ -28,6 +28,7 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
+-spec start_session(list(tuple())) -> pid() | {error, term()}.
 start_session(Opts) ->
     Credentials = proplists:get_value(credentials, Opts),
     SSlOpts = proplists:get_value(ssl, Opts),
@@ -41,7 +42,7 @@ start_session(Opts) ->
 
     case supervisor:start_child(?MODULE,  ChildSpec) of
         {ok, _P} = Pid -> Pid;
-        {error, {already_started, P}} -> {ok, P};
+        {error, {already_started, P}} -> P;
         {error, _Reason} = Error -> Error
     end.
 
@@ -58,12 +59,14 @@ init([]) ->
 %% Internal functions
 %%------------------------------------------------------------------------------
 
+-spec open_conn(list(), list(tuple)) -> pid().
 open_conn(Endpoint, SSlOpts) ->
     {ok, Connection} = gun:open(Endpoint, 443,
                                 #{transport => ssl, transport_opts => SSlOpts}),
     {ok, _} = gun:await_up(Connection),
     Connection.
 
+-spec receive_token(pid(), map()) -> {ok, token()} | any().
 receive_token(Connection, #{app_key := Appkey} = Credentials) ->
     ReqBody = betfair_http:url_encode(maps:without([app_key], Credentials)),
     ReqHeaders = [{<<"Content-Type">>, "application/x-www-form-urlencoded"},
