@@ -71,11 +71,13 @@ handle_cast({request, RpcBody}, #state{token = Token,
     _ = lager:info("Making request with body: ~p", [RpcBody]),
     #{method := Method} = RpcBody,
     Json = jsx:encode(RpcBody),
-    lager:info("Body: ~p", [Json]),
-
     ReqHeaders = [{<<"X-Authentication">>, Token},
                   {<<"X-Application">>, Appkey}],
-    _ = gun:post(Conn, "/exchange/betting/json-rpc/v1/" ++ Method, ReqHeaders, Json),
+    Url = "/exchange/betting/json-rpc/v1/" ++ Method,
+
+    _ = lager:info("Sending Json to url ~p: ~p", [Url, Json]),
+
+    _ = gun:post(Conn, Url, ReqHeaders, Json),
 
     {noreply, State};
 handle_cast(_Msg, State) ->
