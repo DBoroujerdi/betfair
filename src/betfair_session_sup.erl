@@ -32,8 +32,9 @@ start_session(Opts) ->
     Credentials = proplists:get_value(credentials, Opts),
     SSlOpts = proplists:get_value(ssl, Opts),
     Endpoint = proplists:get_value(identity_endpoint, Opts),
-    {ok, SessionToken}  = receive_token(open_conn(Endpoint, SSlOpts),
-                                  maps:from_list(Credentials)),
+    Conn = open_conn(Endpoint, SSlOpts),
+    {ok, SessionToken} = receive_token(Conn, maps:from_list(Credentials)),
+    ok = gun:shutdown(Conn),
 
     ChildSpec = betfair_sup:supervisor(betfair_connection_sup,
                                        permanent, [Opts, SessionToken]),
