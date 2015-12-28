@@ -1,38 +1,41 @@
 -module(betfair_ops).
 
--export([list_event_types/2]).
-%% TODO: the rest of the commands
+-export([rpc/1]).
+-export([rpc/2]).
+
+-define(METHOD_PREFIX, <<"SportsAPING/v1.0/">>).
+
+-export_type([rpc/0]).
+
+-define(BASE_RPC, #{jsonrpc => <<"2.0">>, id => <<"1">>}).
 
 
--define(BASE_RPC, #{jsonrpc => "2.0", id => "1"}).
-
-
--type rpc_command() :: #{jsonrpc => string(),
+-type rpc() :: #{jsonrpc => string(),
                          method => string(),
                          id => number(),
                          params => map()}.
 
--type command() :: string().
--type filter() :: map().
+-type method() :: atom().
+-type filters() :: list(tuple()).
 
+-spec rpc(method()) -> map().
+rpc(Method) ->
+    rpc(Method, []).
 
--spec list_event_types(string(), string()) -> rpc_command().
-list_event_types(EventType, Country) ->
-    Filter = #{eventTypeIds => [EventType],
-               marketCountries => [Country]},
-
-    rpc("SportsAPING/v1.0/listEvents", #{params => #{filter => Filter}}).
+-spec rpc(method(), filters()) -> rpc().
+rpc(Method, Filters) ->
+    ?BASE_RPC#{method => method(Method),
+               params => #{filter => maps:from_list(Filters)}}.
 
 
 %%------------------------------------------------------------------------------
 %% Internal
 %%------------------------------------------------------------------------------
 
--spec rpc(command(), filter()) -> rpc_command().
-rpc(Method, Filter) ->
-    ?BASE_RPC#{method => Method,
-               params => #{filter => Filter}}.
-
+method(Method) ->
+    Bin1 = ?METHOD_PREFIX,
+    Bin2 = atom_to_binary(Method, utf8),
+    <<Bin1/binary, Bin2/binary>>.
 
 %%------------------------------------------------------------------------------
 %% Unit Tests
@@ -41,15 +44,27 @@ rpc(Method, Filter) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-list_event_types_test() ->
-    ActualCommand = list_event_types("7", "GB"),
-    Expected = #{ jsonrpc => "2.0",
-                  method => "",
-                  id => "1",
+rpc_test() ->
+    ActualCommand = rpc(listEventTypes),
+    Expected = #{ jsonrpc => <<"2.0">>,
+                  method => <<"SportsAPING/v1.0/listEventTypes">>,
+                  id => <<"1">>,
                   params => #{
-                    filter => #{eventTypeIds => ["7"],
-                                marketCountries => ["GB"]
-                               }
+                    filter => #{}
+                   }},
+
+    ?assertEqual(Expected, ActualCommand).
+
+rpc_with_filters_test() ->
+    MarketFilters = [{eventTypeIds, [1,2,3]},
+                     {marketCountries, [<<"GB">>]}],
+    ActualCommand = rpc(listEvents, MarketFilters),
+    Expected = #{ jsonrpc => <<"2.0">>,
+                  method => <<"SportsAPING/v1.0/listEvents">>,
+                  id => <<"1">>,
+                  params => #{
+                    filter => #{eventTypeIds => [1,2,3],
+                                marketCountries => [<<"GB">>]}
                    }},
 
     ?assertEqual(Expected, ActualCommand).

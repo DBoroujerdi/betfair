@@ -37,8 +37,9 @@ start_session(Opts) ->
 start_connection() ->
     betfair_connection_sup:start_connection(self()).
 
-request(Pid, Command, Filter) ->
-    betfair_connection:request(Pid, {Command, Filter}).
+request(Pid, Method, MFilters) when is_atom(Method),
+                                    is_list(MFilters) ->
+    betfair_connection:request(Pid, betfair_ops:rpc(Method, MFilters)).
 
 request_sync(_Pid, _Command, _Filter) ->
     %% TODO:
@@ -64,11 +65,3 @@ check_opts(Opts, [{_Key, _Value}|Rest]) ->
     check_opts(Opts, Rest);
 check_opts(Opts, []) ->
     Opts.
-
-
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-
-%% TODO: test check_opts
-
--endif

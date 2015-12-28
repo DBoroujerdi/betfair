@@ -22,7 +22,8 @@ start_link(Opts, Session) when is_binary(Session) ->
 start_connection(OwnerPid) when is_pid(OwnerPid) ->
     case supervisor:start_child(?SERVER, []) of
         {_, Pid} when is_pid(Pid) ->
-            _ = betfair_connection:set_owner(Pid, OwnerPid);
+            _ = betfair_connection:set_owner(Pid, OwnerPid),
+            Pid;
         Error ->
             Error
     end.
