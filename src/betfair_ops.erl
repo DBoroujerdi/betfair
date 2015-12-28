@@ -3,8 +3,6 @@
 -export([rpc/1]).
 -export([rpc/2]).
 
--define(METHOD_PREFIX, <<"SportsAPING/v1.0/">>).
-
 -export_type([rpc/0]).
 
 -define(BASE_RPC, #{jsonrpc => <<"2.0">>, id => <<"1">>}).
@@ -33,9 +31,7 @@ rpc(Method, Filters) ->
 %%------------------------------------------------------------------------------
 
 method(Method) ->
-    Bin1 = ?METHOD_PREFIX,
-    Bin2 = atom_to_binary(Method, utf8),
-    <<Bin1/binary, Bin2/binary>>.
+    betfair:concat(<<"SportsAPING/v1.0/">>, betfair:any_to_binary(Method)).
 
 %%------------------------------------------------------------------------------
 %% Unit Tests

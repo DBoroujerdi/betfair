@@ -8,6 +8,8 @@
 -export([start_connection/0]).
 -export([request/3]).
 -export([request_sync/3]).
+-export([any_to_binary/1]).
+-export([concat/2]).
 
 -define(SCOPE, l).
 
@@ -45,6 +47,18 @@ request_sync(_Pid, _Command, _Filter) ->
     %% TODO:
     ok.
 
+
+%%------------------------------------------------------------------------------
+%% Util
+%%------------------------------------------------------------------------------
+
+any_to_binary(Any) when is_atom(Any) ->
+    atom_to_binary(Any, utf8);
+any_to_binary(Any) when is_list(Any) ->
+    list_to_binary(Any).
+
+concat(Bin1, Bin2) when is_binary(Bin1), is_binary(Bin2) ->
+    <<Bin1/binary, Bin2/binary>>.
 
 %%------------------------------------------------------------------------------
 %% Internal
