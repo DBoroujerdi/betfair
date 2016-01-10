@@ -1,15 +1,13 @@
--module(betfair_session_sup).
+-module(betfair_session).
 
--behaviour(supervisor).
+-export([new_session/1]).
 
-%% API
--export([start_link/0]).
--export([start_session/1]).
+-define(URL_ENCODED, "application/x-www-form-urlencoded").
 
-%% Supervisor callbacks
--export([init/1]).
 
--define(SERVER, ?MODULE).
+%%------------------------------------------------------------------------------
+%% Types
+%%------------------------------------------------------------------------------
 
 -type token() :: string().
 
@@ -25,34 +23,18 @@
 %% API functions
 %%------------------------------------------------------------------------------
 
-start_link() ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+%% TODO: Tidy and simplify this module.
+%% TODO: Do not pass in all opts - only pass in what is needed
 
--spec start_session(list(tuple())) -> pid() | {error, term()}.
-start_session(Opts) ->
+-spec new_session(list(tuple())) -> pid() | {ok, string()}.
+new_session(Opts) ->
     Credentials = proplists:get_value(credentials, Opts),
     SSlOpts = proplists:get_value(ssl, Opts),
     Endpoint = proplists:get_value(identity_endpoint, Opts),
     Conn = open_conn(Endpoint, SSlOpts),
     {ok, SessionToken} = receive_token(Conn, maps:from_list(Credentials)),
     ok = gun:shutdown(Conn),
-
-    ChildSpec = betfair_sup:supervisor(betfair_connection_sup,
-                                       permanent, [Opts, SessionToken]),
-
-    case supervisor:start_child(?MODULE,  ChildSpec) of
-        {ok, _P} = Pid -> Pid;
-        {error, {already_started, P}} -> P;
-        {error, _Reason} = Error -> Error
-    end.
-
-
-%%------------------------------------------------------------------------------
-%% Supervisor callbacks
-%%------------------------------------------------------------------------------
-
-init([]) ->
-    {ok, {{one_for_one, 1, 5}, []}}.
+    {ok, SessionToken}.
 
 
 %%------------------------------------------------------------------------------
@@ -69,8 +51,8 @@ open_conn(Endpoint, SSlOpts) ->
 -spec receive_token(pid(), map()) -> {ok, token()} | any().
 receive_token(Connection, #{app_key := Appkey} = Credentials) ->
     ReqBody = betfair_http:url_encode(maps:without([app_key], Credentials)),
-    ReqHeaders = [{<<"Content-Type">>, "application/x-www-form-urlencoded"},
-                  {<<"X-Application">>, Appkey}],
+    ReqHeaders = [betfair_http:hdr(<<"Content-Type">>, ?URL_ENCODED),
+                  betfair_http:hdr(<<"X-Application">>, Appkey)],
     Stream = gun:post(Connection, "/api/certlogin", ReqHeaders, ReqBody),
     receive_data(Connection, Stream).
 

@@ -3,9 +3,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2]).
+-export([start_link/0]).
 -export([request/2]).
--export([set_owner/2]).
 
 -define(SCOPE, l).
 
@@ -18,34 +17,32 @@
          code_change/3]).
 
 -define(SERVER, ?MODULE).
+-define(EMPTY_BIN, <<>>).
 
--record(state, {token, connection, app_key, owner}).
+-record(state, {token, connection, app_key, callers, data}).
 
-%% TODO: Actually do something with the connection and request
 
 %%------------------------------------------------------------------------------
-%% Api
+%% API
 %%------------------------------------------------------------------------------
 
-start_link(Opts, SessionToken) ->
-    gen_server:start_link(?MODULE, [Opts, SessionToken], []).
+start_link() ->
+    gen_server:start_link(?MODULE, [], []).
 
--spec request(pid(), betfair_ops:rpc()) -> ok.
+-spec request(pid(), betfair_rpc:rpc()) -> ok.
 request(Pid, RpcBody) ->
-    gen_server:cast(Pid, {request, RpcBody}).
-
--spec set_owner(pid(), pid()) -> {ok, reference()}.
-set_owner(Pid, OwnerPid) ->
-    gen_server:call(Pid, {owner_pid, OwnerPid}).
+    gen_server:cast(Pid, {request, self(), RpcBody}).
 
 
 %%------------------------------------------------------------------------------
 %% gen-server callbacks
 %%------------------------------------------------------------------------------
 
-init([Opts, Session]) ->
+init([]) ->
+    Opts = betfair:get_opts(),
     SslOpts = proplists:get_value(ssl, Opts),
     Credentials = proplists:get_value(credentials, Opts),
+    {ok, Session} = betfair_session_token_store:get_token(),
 
     _ = lager:info("Connecting to the betfair api with token ~p", [Session]),
     Endpoint = proplists:get_value(exchange_endpoint, Opts),
@@ -56,44 +53,50 @@ init([Opts, Session]) ->
 
     {ok, #state{token=Session,
                 connection=Connection,
-                app_key=app_key(Credentials)}}.
+                app_key=app_key(Credentials),
+                callers=#{},
+                data=?EMPTY_BIN}}.
 
-handle_call({owner_pid, Pid}, _From, State) ->
-    Mref = erlang:monitor(process, Pid),
-    {reply, {ok, Mref}, State#state{owner=Pid}};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
-handle_cast({request, RpcBody}, #state{token = Token,
-                                       connection = Conn,
-                                       app_key = Appkey} = State) ->
-    _ = lager:info("Making request with body: ~p", [RpcBody]),
+handle_cast({request, Caller, RpcBody}, #state{token = Token,
+                                               connection = Conn,
+                                               app_key = Appkey,
+                                               callers = Callers} = State) ->
     #{method := Method} = RpcBody,
     Json = jsx:encode(RpcBody),
     ReqHeaders = [{<<"X-Authentication">>, Token},
                   {<<"X-Application">>, Appkey}],
-    Url = "/exchange/betting/json-rpc/v1/" ++ Method,
+    Url = "/exchange/betting/json-rpc/v1/" ++ binary_to_list(Method),
 
     _ = lager:info("Sending Json to url ~p: ~p", [Url, Json]),
 
-    _ = gun:post(Conn, Url, ReqHeaders, Json),
-
-    {noreply, State};
+    Stream = gun:post(Conn, Url, ReqHeaders, Json),
+    {noreply, State#state{callers = Callers#{Stream => Caller}}};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({gun_data, _Conn, _Stream, fin, Data},
-            #{owner := _Owner} = State) ->
-    lager:info("Response: ~p", [Data]),
+handle_info({gun_response, _, _, nofin, 200, _}, State) ->
+    {noreply, State};
+handle_info({gun_response, _, _, fin, Status, Headers}, State) ->
+    Reason = betfair_http:handle_status(Status, Headers),
+    {stop, Reason, State};
+handle_info({gun_data, _, _, nofin, Part}, #state{data = Acc} = State) ->
+    {noreply, State#state{data = <<Acc/binary, Part/binary>>}};
+handle_info({gun_data, _, Stream, fin, Part}, #state{data = Acc,
+                                                     callers = Callers} = State) ->
+    Data = <<Acc/binary, Part/binary>>,
 
-    %% TODO: Send data on to message processor pool
-
-    {no_reply, State};
-handle_info({'DOWN', _MRef, process, _ServerPid, _Reason}, State) ->
-    {stop, normal, State};
+    case maps:find(Stream, Callers) of
+        {ok, Caller} -> Caller ! {betfair_response, Caller, Data},
+                        {noreply, State#state{data = <<>>,
+                                              callers = maps:remove(Stream, Callers)}};
+        error        -> {stop, error, State}
+    end;
 handle_info(Info, State) ->
-    lager:warning("Unexpected response: ~p", [Info]),
+    _ = lager:warning("Unexpected response: ~p", [Info]),
     {noreply, State}.
 terminate(_Reason, #state{connection=Connection}) ->
     gun:shutdown(Connection).

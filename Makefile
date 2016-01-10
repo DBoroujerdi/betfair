@@ -5,7 +5,7 @@ PROJECT_VERSION = 0.1.0
 
 COVER = 1
 
-DEPS = lager jsx gun gproc
+DEPS = lager jsx gun gproc pooler
 TEST_DEPS = meck
 
 DIALYZER_DIRS = ebin

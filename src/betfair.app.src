@@ -11,7 +11,8 @@
     ssl,
     gproc,
     lager,
-    gun
+    gun,
+    pooler
    ]},
   {env,[]},
   {modules, []},

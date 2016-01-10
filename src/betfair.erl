@@ -1,21 +1,14 @@
 -module(betfair).
 
--export([start/0]).
--export([make/0]).
--export([get_opts/0]).
--export([start_session/0]).
--export([start_session/1]).
--export([start_connection/0]).
--export([request/3]).
--export([request_sync/3]).
--export([any_to_binary/1]).
--export([concat/2]).
+-export([start/0,
+         make/0,
+         get_opts/0,
+         prop/1,
+         request/2,
+         request/3]).
 
 -define(SCOPE, l).
-
-
-%% TODO: api inputs validation!
-%% TODO: Sync requests
+-define(TIMEOUT, 5000). %% TODO: pass in as option
 
 
 %%------------------------------------------------------------------------------
@@ -28,54 +21,66 @@ make() ->
 start() ->
     application:ensure_all_started(?MODULE).
 
+-spec get_opts() -> list(tuple()).
 get_opts() ->
-    application:get_all_env(betfair).
+    application:get_all_env(?MODULE).
 
-start_session() ->
-    start_session(get_opts()).
-start_session(Opts) ->
-    betfair_session_sup:start_session(check_opts(Opts)).
+-spec prop(atom()) -> list().
+prop(Name) ->
+    proplists:get_value(Name, get_opts()).
 
-start_connection() ->
-    betfair_connection_sup:start_connection(self()).
+-type betfair_sync_response() :: {betfair_response, binary()} | {error, term()}.
+-type betfair_async_response() :: ok | {error, term()}.
+-type betfair_response() :: betfair_sync_response() | betfair_async_response().
 
-request(Pid, Method, MFilters) when is_atom(Method),
-                                    is_list(MFilters) ->
-    betfair_connection:request(Pid, betfair_ops:rpc(Method, MFilters)).
+-spec request(atom(), list(tuple())) -> betfair_response().
+request(Method, MFilters) ->
+    request(Method, MFilters, []).
 
-request_sync(_Pid, _Command, _Filter) ->
-    %% TODO:
-    ok.
+-spec request(atom(), list(tuple()), list(tuple())) -> betfair_response().
+request(Method, MFilters, Opts) ->
+    case betfair_rpc:check_filters(MFilters) of
+        ok    -> case betfair_rpc:is_valid_method(Method) of
+                     true  -> do_request(Method, MFilters, Opts);
+                     _     -> {invalid_method, Method}
+                 end;
+        Error -> {incorrect_filter, Error}
+    end.
 
-
-%%------------------------------------------------------------------------------
-%% Util
-%%------------------------------------------------------------------------------
-
-any_to_binary(Any) when is_atom(Any) ->
-    atom_to_binary(Any, utf8);
-any_to_binary(Any) when is_list(Any) ->
-    list_to_binary(Any).
-
-concat(Bin1, Bin2) when is_binary(Bin1), is_binary(Bin2) ->
-    <<Bin1/binary, Bin2/binary>>.
 
 %%------------------------------------------------------------------------------
 %% Internal
 %%------------------------------------------------------------------------------
 
-check_opts(Opts) when is_list(Opts) ->
-    check_opts(Opts, Opts).
+-spec do_request(atom(), list(tuple()), list(tuple())) ->
+                        {error, term()} | binary().
+do_request(Method, MFilters, [{sync, true}]) ->
+    sync_request(Method, MFilters, self());
+do_request(Method, MFilters, []) ->
+    async_request(Method, MFilters).
 
-check_opts(Opts, [{keep_alive, KeepAlive}|Rest]) when is_number(KeepAlive) ->
-    check_opts(Opts, Rest);
-check_opts(Opts, [{num_conns, NumCons}|Rest]) when is_number(NumCons) ->
-    check_opts(Opts, Rest);
-check_opts(Opts, [{ssl, SslOpts}|Rest]) when is_list(SslOpts) ->
-    check_opts(Opts, Rest);
-check_opts(Opts, [{credentials, Credentials}|Rest]) when is_list(Credentials)  ->
-    check_opts(Opts, Rest);
-check_opts(Opts, [{_Key, _Value}|Rest]) ->
-    check_opts(Opts, Rest);
-check_opts(Opts, []) ->
-    Opts.
+sync_request(Method, MFilters, Caller) ->
+    case pooler:take_member(connection_pool) of
+        Pid when is_pid(Pid) ->
+            Rpc = betfair_rpc:new(Method, MFilters),
+            ok = betfair_connection:request(Pid, Rpc),
+            _ = pooler:return_member(connection_pool, Pid, ok),
+            receive
+                {betfair_response, Caller, Response} ->
+                    Response;
+                Unknown ->
+                    {unknown_response, Unknown}
+            after ?TIMEOUT ->
+                    {error, timeout}
+            end;
+        Error -> {error, Error}
+    end.
+
+async_request(Method, MFilters) ->
+    case pooler:take_member(connection_pool) of
+        Pid when is_pid(Pid) ->
+            Rpc = betfair_rpc:new(Method, MFilters),
+            betfair_connection:request(Pid, Rpc),
+            _ = pooler:return_member(connection_pool, Pid, ok);
+        Error -> {error, Error}
+    end.

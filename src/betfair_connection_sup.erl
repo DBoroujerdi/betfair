@@ -3,8 +3,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/2]).
--export([start_connection/1]).
+-export([start_link/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -16,29 +15,15 @@
 %% API functions
 %%------------------------------------------------------------------------------
 
-start_link(Opts, Session) when is_binary(Session) ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, [Opts, Session]).
-
-start_connection(OwnerPid) when is_pid(OwnerPid) ->
-    case supervisor:start_child(?SERVER, []) of
-        {_, Pid} when is_pid(Pid) ->
-            _ = betfair_connection:set_owner(Pid, OwnerPid),
-            Pid;
-        Error ->
-            Error
-    end.
+start_link() ->
+    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 
 %%------------------------------------------------------------------------------
 %% Supervisor callbacks
 %%------------------------------------------------------------------------------
 
-init([Opts, Session]) ->
-    SupFlags = #{strategy => simple_one_for_one,
-                 intensity => 1,
-                 period => 5},
-    ChildSpecs = [#{id => betfair_connection,
-                    restart => transient,
-                    start => {betfair_connection, start_link, [Opts, Session]},
-                    shutdown => 5000}],
-    {ok, {SupFlags, ChildSpecs}}.
+init([]) ->
+    PoolerSup = {pooler_sup, {pooler_sup, start_link, []},
+                 permanent, infinity, supervisor, [pooler_sup]},
+    {ok, {{one_for_one, 5, 10}, [PoolerSup]}}.
