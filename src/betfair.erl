@@ -4,6 +4,7 @@
          make/0,
          get_opts/0,
          prop/1,
+         request/1,
          request/2,
          request/3]).
 
@@ -29,15 +30,22 @@ get_opts() ->
 prop(Name) ->
     proplists:get_value(Name, get_opts()).
 
--type betfair_sync_response() :: {betfair_response, binary()} | {error, term()}.
--type betfair_async_response() :: ok | {error, term()}.
--type betfair_response() :: betfair_sync_response() | betfair_async_response().
+-type method() :: atom().
+-type market_filters() :: list(tuple()).
 
--spec request(atom(), list(tuple())) -> betfair_response().
+-type sync_response() :: {betfair_response, binary()} | {error, term()}.
+-type async_response() :: ok | {error, term()}.
+-type response() :: sync_response() | async_response().
+
+-spec request(method()) -> response().
+request(Method) ->
+    request(Method, []).
+
+-spec request(method(), market_filters()) -> response().
 request(Method, MFilters) ->
     request(Method, MFilters, []).
 
--spec request(atom(), list(tuple()), list(tuple())) -> betfair_response().
+-spec request(method(), market_filters(), list(tuple())) -> response().
 request(Method, MFilters, Opts) ->
     case betfair_rpc:check_filters(MFilters) of
         ok    -> case betfair_rpc:is_valid_method(Method) of
