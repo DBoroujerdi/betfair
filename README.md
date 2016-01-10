@@ -25,7 +25,8 @@ Example..
     {keep_alive, 1},
     {identity_endpoint, "identitysso.betfair.com"},
     {exchange_endpoint, "api.betfair.com"}
-    ```
+
+```
 
 Run
 ---
