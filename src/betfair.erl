@@ -67,6 +67,7 @@ do_request(Method, MFilters, [{sync, true}]) ->
 do_request(Method, MFilters, []) ->
     async_request(Method, MFilters).
 
+-spec sync_request(atom(), list(tuple()), pid()) -> {error, any()} | binary().
 sync_request(Method, MFilters, Caller) ->
     case pooler:take_member(connection_pool) of
         Pid when is_pid(Pid) ->
@@ -84,6 +85,7 @@ sync_request(Method, MFilters, Caller) ->
         Error -> {error, Error}
     end.
 
+-spec async_request(atom(), list(tuple())) -> {error, any()} | ok.
 async_request(Method, MFilters) ->
     case pooler:take_member(connection_pool) of
         Pid when is_pid(Pid) ->
