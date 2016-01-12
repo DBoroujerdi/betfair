@@ -86,15 +86,16 @@ method(Method) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+
 rpc_test() ->
     ActualCommand = ?MODULE:new(listEventTypes),
     Expected = #{jsonrpc => <<"2.0">>,
                  method => <<"SportsAPING/v1.0/listEventTypes">>,
                  id => <<"1">>,
-                 params => #{
-                   filter => #{}}},
+                 params => #{filter => #{}}},
 
     ?assertEqual(Expected, ActualCommand).
+
 
 rpc_with_filters_test() ->
     MarketFilters = [{eventTypeIds, [1, 2, 3]},
@@ -103,9 +104,8 @@ rpc_with_filters_test() ->
     Expected = #{jsonrpc => <<"2.0">>,
                  method => <<"SportsAPING/v1.0/listEvents">>,
                  id => <<"1">>,
-                 params => #{
-                   filter => #{eventTypeIds => [1, 2, 3],
-                               marketCountries => [<<"GB">>]}}},
+                 params => #{filter => #{eventTypeIds => [1, 2, 3],
+                                         marketCountries => [<<"GB">>]}}},
 
     ?assertEqual(Expected, ActualCommand).
 
