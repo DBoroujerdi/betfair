@@ -15,4 +15,4 @@ include erlang.mk
 ERLC_OPTS += +'{parse_transform, lager_transform}'
 TEST_ERLC_OPTS += +'{parse_transform, lager_transform}'
 
-PLT_APPS = inets ssl crypto tools runtime_tools
+PLT_APPS = inets ssl crypto tools runtime_tools compiler
