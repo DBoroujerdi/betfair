@@ -61,14 +61,14 @@ handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
-handle_cast({request, Caller, RpcBody}, #state{token = Token,
-                                               connection = Conn,
-                                               app_key = Appkey,
-                                               callers = Callers} = State) ->
-    #{method := Method} = RpcBody,
-    Json = jsx:encode(RpcBody),
+handle_cast({request, Caller, Rpc}, #state{token = Token,
+                                           connection = Conn,
+                                           app_key = Appkey,
+                                           callers = Callers} = State) ->
+    Json = jsx:encode(Rpc),
     ReqHeaders = [{<<"X-Authentication">>, Token},
                   {<<"X-Application">>, Appkey}],
+    Method = proplists:get_value(method, Rpc),
     Url = "/exchange/betting/json-rpc/v1/" ++ binary_to_list(Method),
 
     _ = lager:info("Sending Json to url ~p: ~p", [Url, Json]),
@@ -85,10 +85,9 @@ handle_info({gun_response, _, _, fin, Status, Headers}, State) ->
     {stop, Reason, State};
 handle_info({gun_data, _, _, nofin, Part}, #state{data = Acc} = State) ->
     {noreply, State#state{data = <<Acc/binary, Part/binary>>}};
-handle_info({gun_data, _, Stream, fin, Part}, #state{data = Acc,
-                                                     callers = Callers} = State) ->
+handle_info({gun_data, _, Stream, fin, Part},
+            #state{data = Acc, callers = Callers} = State) ->
     Data = <<Acc/binary, Part/binary>>,
-
     case maps:find(Stream, Callers) of
         {ok, Caller} -> Caller ! {betfair_response, Caller, Data},
                         {noreply, State#state{data = <<>>,

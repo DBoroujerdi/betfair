@@ -25,6 +25,8 @@ start(_, _) ->
                   {init_count, betfair:prop(num_connections)},
                   {start_mfa, {betfair_connection, start_link, []}}],
 
+    _ = lager:info("~p", [PoolConfig]),
+
     {ok, _} = pooler:new_pool(PoolConfig),
 
     betfair_sup:start_link(Opts).
