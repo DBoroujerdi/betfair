@@ -2,12 +2,8 @@
 
 -export([new/1]).
 -export([new/2]).
+-export([check/2]).
 -export([check_params/1]).
--export([is_valid_method/1]).
-
--define(METHODS, [list_event_types,
-                  list_events,
-                  list_market_catalogue]).
 
 -define(APING_PREFIX, <<"SportsAPING/v1.0/">>).
 
@@ -46,6 +42,15 @@ new(Method, Params) ->
     ?BASE_RPC ++ [{method, method(Method)},
                   {params, params(Params)}].
 
+-spec check(atom(), betfair:params()) -> ok | {error, atom(), any()}.
+check(list_event_types, Params) ->
+    check_params(contains(Params, [filter]));
+check(list_events, Params) ->
+    check_params(contains(Params, [filter]));
+check(list_market_catalogue, Params) ->
+    check_params(contains(Params, [filter, max_results]));
+check(Method, _) ->
+    {error, invalid_method, Method}.
 
 -spec check_params(list(tuple())) -> ok | {check_error, tuple()}.
 check_params([]) -> ok;
@@ -53,16 +58,20 @@ check_params(Params) when is_list(Params) ->
     check_params(Params, fun check_param/1).
 
 
--spec is_valid_method(atom()) -> boolean().
-is_valid_method(Method) when is_atom(Method) ->
-    lists:member(Method, ?METHODS);
-is_valid_method(_) ->
-    false.
-
-
 %%------------------------------------------------------------------------------
 %% Internal
 %%------------------------------------------------------------------------------
+
+-spec contains(list(tuple()), list(atom())) -> ok | {error, missing_params}.
+contains(Params, Required) ->
+    case check_members_of(Required, names(Params)) of
+        ok -> Params;
+        _ -> {error, missing_param}
+    end.
+
+
+-spec names(list(tuple())) -> list(atom()).
+names(Params) -> proplists:get_keys(Params).
 
 -spec check_params(list(tuple()), fun()) -> ok | {check_error, any()}.
 check_params([], _) -> ok;

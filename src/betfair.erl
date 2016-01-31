@@ -14,6 +14,7 @@
 -export_type([method/0]).
 -export_type([params/0]).
 
+
 %%------------------------------------------------------------------------------
 %% API
 %%------------------------------------------------------------------------------
@@ -51,11 +52,8 @@ request(Method, Params) ->
 
 -spec request(method(), params(), options()) -> response().
 request(Method, Params, Opts) ->
-    case betfair_rpc:check_params(Params) of
-        ok    -> case betfair_rpc:is_valid_method(Method) of
-                     true  -> do_request(Method, Params, Opts);
-                     _     -> {invalid_method, Method}
-                 end;
+    case betfair_rpc:check(Method, Params) of
+        ok  -> do_request(Method, Params, Opts);
         Error -> {incorrect_filter, Error}
     end.
 
