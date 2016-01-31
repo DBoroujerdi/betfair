@@ -38,7 +38,7 @@ Api
 ---
 
 Sync request
-``` betfair:request(listEventTypes, []). ```
+``` betfair:request(list_event_types, []). ```
 
 Async request
-``` betfair:request(listEventTypes, [], [{sync, true}]). ```
+``` betfair:request(list_event_types, [], [{sync, true}]). ```
