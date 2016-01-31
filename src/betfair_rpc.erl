@@ -5,7 +5,9 @@
 -export([check_params/1]).
 -export([is_valid_method/1]).
 
--define(METHODS, [list_event_types, list_events]).
+-define(METHODS, [list_event_types,
+                  list_events,
+                  list_market_catalogue]).
 
 -define(APING_PREFIX, <<"SportsAPING/v1.0/">>).
 
@@ -102,13 +104,16 @@ check_members_of([H|T], List) ->
 
 
 -spec check_filter(tuple()) -> incorrect_type | ok.
-check_filter({event_type_ids, Filter}) ->
-    case Filter of
-        F when false =:= is_list(F) -> incorrect_type;
-        F -> check_integer_types(F)
-    end;
+check_filter({event_type_ids, Filter}) -> is_integer_list(Filter);
+check_filter({event_ids, Filter}) -> is_integer_list(Filter);
 check_filter(Tuple) -> {unknown_filter, Tuple}.
 
+-spec is_integer_list(list(integer())) -> incorrect_type | ok.
+is_integer_list(Val) ->
+    case Val of
+        V when false =:= is_list(V) -> incorrect_type;
+        V -> check_integer_types(V)
+    end.
 
 -spec check_integer_types(List) -> ok | {invalid_value, Reason} when
       List :: list(integer()) | [],

@@ -49,3 +49,6 @@ Example Requests
 
 All horse racing events
 ``` betfair:request(list_events, [{filter, [{event_type_ids, [7]}]}]). ```
+
+List markets for event
+``` betfair:request(list_market_catalogue, [{filter, [{event_ids, [27673834]}]}, {max_results, 200}, {market_projection, [<<"COMPETITION">>, <<"EVENT">>, <<"EVENT_TYPE">>, <<"RUNNER_DESCRIPTION">>, <<"RUNNER_METADATA">>, <<"MARKET_START_TIME">>]}]). ```
