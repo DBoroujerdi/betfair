@@ -5,7 +5,7 @@
 -export([check_params/1]).
 -export([is_valid_method/1]).
 
--define(METHODS, [list_event_types]).
+-define(METHODS, [list_event_types, list_events]).
 
 -define(APING_PREFIX, <<"SportsAPING/v1.0/">>).
 

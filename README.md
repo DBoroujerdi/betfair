@@ -42,3 +42,10 @@ Sync request
 
 Async request
 ``` betfair:request(list_event_types, [], [{sync, true}]). ```
+
+
+Example Requests
+----------------
+
+All horse racing events
+``` betfair:request(list_events, [{filter, [{event_type_ids, [7]}]}]). ```
