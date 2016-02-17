@@ -53,7 +53,7 @@ request(Method, Params) ->
 -spec request(method(), params(), options()) -> response().
 request(Method, Params, Opts) ->
     case betfair_rpc:check(Method, Params) of
-        ok  -> do_request(Method, Params, Opts);
+        ok  -> make_request(Method, Params, Opts);
         Error -> {incorrect_filter, Error}
     end.
 
@@ -62,37 +62,24 @@ request(Method, Params, Opts) ->
 %% Internal
 %%------------------------------------------------------------------------------
 
+make_request(list_market_book, _Params, _Opts) ->
+    %% rate limit using Jobs
+    ok;
+make_request(Method, Params, Opts) ->
+    do_request(Method, Params, Opts).
+
 -spec do_request(atom(), list(tuple()), list(tuple())) ->
                         {error, term()} | binary().
 do_request(Method, Params, [{sync, true}]) ->
-    sync_request(Method, Params, self());
+    ok = betfair_connection:request(betfair_rpc:new(Method, Params)),
+    Self = self(),
+    receive
+        {betfair_response, Self, Response} ->
+            Response;
+        Unknown ->
+            {unknown_response, Unknown}
+    after ?TIMEOUT ->
+            {error, timeout}
+    end;
 do_request(Method, Params, []) ->
-    async_request(Method, Params).
-
--spec sync_request(atom(), list(tuple()), pid()) -> {error, any()} | binary().
-sync_request(Method, Params, Caller) ->
-    case pooler:take_member(connection_pool) of
-        Pid when is_pid(Pid) ->
-            Rpc = betfair_rpc:new(Method, Params),
-            ok = betfair_connection:request(Pid, Rpc),
-            _ = pooler:return_member(connection_pool, Pid, ok),
-            receive
-                {betfair_response, Caller, Response} ->
-                    Response;
-                Unknown ->
-                    {unknown_response, Unknown}
-            after ?TIMEOUT ->
-                    {error, timeout}
-            end;
-        Error -> {error, Error}
-    end.
-
--spec async_request(atom(), list(tuple())) -> {error, any()} | ok.
-async_request(Method, Params) ->
-    case pooler:take_member(connection_pool) of
-        Pid when is_pid(Pid) ->
-            Rpc = betfair_rpc:new(Method, Params),
-            betfair_connection:request(Pid, Rpc),
-            _ = pooler:return_member(connection_pool, Pid, ok);
-        Error -> {error, Error}
-    end.
+    betfair_connection:request(betfair_rpc:new(Method, Params)).

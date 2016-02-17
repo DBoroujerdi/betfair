@@ -35,7 +35,8 @@ start_link(Opts) ->
 
 init([Opts]) ->
     ResponseSup = supervisor(betfair_response_processor_sup, permanent, [Opts]),
-    {ok, {{one_for_one, 5, 10}, [ResponseSup]}}.
+    ConnectionSup = supervisor(betfair_connection_sup, permanent, []),
+    {ok, {{one_for_one, 5, 10}, [ResponseSup, ConnectionSup]}}.
 
 
 %%------------------------------------------------------------------------------

@@ -44,7 +44,7 @@ new(Method, Params) ->
 
 -spec check(atom(), betfair:params()) -> ok | {error, atom(), any()}.
 check(list_event_types, Params) ->
-    check_params(contains(Params, [filter]));
+    check_params(contains(Params, []));
 check(list_events, Params) ->
     check_params(contains(Params, [filter]));
 check(list_market_catalogue, Params) ->
@@ -103,8 +103,7 @@ check_param(Param) -> {unknown_param, Param}.
 
 
 -spec check_members_of(list(), list()) -> unknown_value | ok.
-check_members_of([], _) ->
-    ok;
+check_members_of([], _) -> ok;
 check_members_of([H|T], List) ->
     case lists:member(H, List) of
         true  -> check_members_of(T, List);

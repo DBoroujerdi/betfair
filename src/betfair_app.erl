@@ -20,15 +20,6 @@ start(_, _) ->
     ok = betfair_session_token_store:new(),
     ok = setup_session(Opts),
 
-    PoolConfig = [{name, connection_pool},
-                  {max_count, betfair:prop(max_connections)},
-                  {init_count, betfair:prop(num_connections)},
-                  {start_mfa, {betfair_connection, start_link, []}}],
-
-    _ = lager:info("~p", [PoolConfig]),
-
-    {ok, _} = pooler:new_pool(PoolConfig),
-
     betfair_sup:start_link(Opts).
 
 stop(_) ->

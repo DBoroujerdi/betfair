@@ -4,7 +4,7 @@
 
 %% API
 -export([start_link/0]).
--export([request/2]).
+-export([request/1]).
 
 -define(SCOPE, l).
 
@@ -27,11 +27,11 @@
 %%------------------------------------------------------------------------------
 
 start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec request(pid(), betfair_rpc:rpc()) -> ok.
-request(Pid, RpcBody) ->
-    gen_server:cast(Pid, {request, self(), RpcBody}).
+-spec request(map()) -> ok.
+request(RpcBody) ->
+    gen_server:cast(?MODULE, {request, self(), RpcBody}).
 
 
 %%------------------------------------------------------------------------------
