@@ -23,24 +23,24 @@
 
 -define(BASE_RPC, [{jsonrpc, <<"2.0">>}, {id, <<"1">>}]).
 
-%% -type rpc() :: [{jsonrpc, binary()},
-%%                 {method, binary()},
-%%                 {id, binary()},
-%%                 {params, map()}].
+-type rpc() :: #{jsonrpc => Rpc::binary(),
+                 method  => Method::binary(),
+                 id      => Id::binary(),
+                 params  => Params::map()}.
 
 
 %%------------------------------------------------------------------------------
 %% API
 %%------------------------------------------------------------------------------
 
--spec new(betfair:method()) -> map().
+-spec new(betfair:method()) -> rpc().
 new(Method) ->
     new(Method, []).
 
--spec new(betfair:method(), betfair:params()) -> list(tuple).
+-spec new(betfair:method(), betfair:params()) -> rpc().
 new(Method, Params) ->
-    ?BASE_RPC ++ [{method, method(Method)},
-                  {params, params(Params)}].
+    maps:from_list(?BASE_RPC ++ [{method, method(Method)},
+                                 {params, params(Params)}]).
 
 -spec check(atom(), betfair:params()) -> ok | {error, atom(), any()}.
 check(list_event_types, Params) ->
@@ -49,6 +49,8 @@ check(list_events, Params) ->
     check_params(contains(Params, [filter]));
 check(list_market_catalogue, Params) ->
     check_params(contains(Params, [filter, max_results]));
+check(list_market_book, Params) ->
+    check_params(contains(Params, [market_ids, price_projection]));
 check(Method, _) ->
     {error, invalid_method, Method}.
 
@@ -62,7 +64,7 @@ check_params(Params) when is_list(Params) ->
 %% Internal
 %%------------------------------------------------------------------------------
 
--spec contains(list(tuple()), list(atom())) -> ok | {error, missing_params}.
+-spec contains([tuple()], [atom()]) -> [tuple()] | {error, missing_params}.
 contains(Params, Required) ->
     case check_members_of(Required, names(Params)) of
         ok -> Params;

@@ -4,9 +4,18 @@
          make/0,
          get_opts/0,
          prop/1,
-         request/1,
+         new_session/0,
+         subscribe/2,
+         unsubscribe/2,
          request/2,
-         request/3]).
+         request/3,
+         keep_alive/1,
+         get_env/1,
+         get_env/2,
+         get_env_bin/1,
+         domain/1,
+         credentials/0,
+         ssl_options/0]).
 
 -define(SCOPE, l).
 -define(TIMEOUT, 5000). %% TODO: pass in as option
@@ -33,53 +42,80 @@ get_opts() ->
 prop(Name) ->
     proplists:get_value(Name, get_opts()).
 
+-spec subscribe(binary(), binary()) -> {ok, pid()} | {error, term()}.
+subscribe(Market, Token) ->
+    case betfair_stream_sup:start_stream(Market, Token) of
+        {error, _} = Error ->
+            Error;
+        Ok ->
+            _ = gproc_ps:subscribe(?SCOPE, {market_update, Market}),
+            Ok
+    end.
+
+unsubscribe(_Pid, _Market) ->
+    ok.
+
+-spec new_session() -> {ok, binary()} | {error, term()}.
+new_session() ->
+    betfair_request:login().
 
 -type sync_response() :: {betfair_response, binary()} | {error, term()}.
 -type async_response() :: ok | {error, term()}.
 -type response() :: sync_response() | async_response().
 
--type method() :: list_event_types.
+-type method() :: atom().
 -type params() :: list(tuple()).
--type options() :: list(tuple()).
+%% -type options() :: list(tuple()).
 
--spec request(atom()) -> response().
-request(Method) ->
-    request(Method, []).
+-spec request(atom(), binary()) -> response().
+request(Method, Token) ->
+    request(Method, Token, []).
 
--spec request(method(), params()) -> response().
-request(Method, Params) ->
-    request(Method, Params, []).
-
--spec request(method(), params(), options()) -> response().
-request(Method, Params, Opts) ->
+-spec request(method(), binary(), params()) -> response().
+request(Method, Token, Params) ->
     case betfair_rpc:check(Method, Params) of
-        ok  -> make_request(Method, Params, Opts);
-        Error -> {incorrect_filter, Error}
+        ok  ->
+            Rpc = betfair_rpc:new(Method, Params),
+            betfair_request:request(Method, Rpc, Token);
+        Error -> {error, Error}
     end.
+
+%% keep the session alive
+keep_alive(_Session) ->
+    %% TODO
+    ok.
 
 
 %%------------------------------------------------------------------------------
 %% Internal
 %%------------------------------------------------------------------------------
 
-make_request(list_market_book, _Params, _Opts) ->
-    %% rate limit using Jobs
-    ok;
-make_request(Method, Params, Opts) ->
-    do_request(Method, Params, Opts).
+ssl_options() ->
+    get_env(ssl).
 
--spec do_request(atom(), list(tuple()), list(tuple())) ->
-                        {error, term()} | binary().
-do_request(Method, Params, [{sync, true}]) ->
-    ok = betfair_connection:request(betfair_rpc:new(Method, Params)),
-    Self = self(),
-    receive
-        {betfair_response, Self, Response} ->
-            Response;
-        Unknown ->
-            {unknown_response, Unknown}
-    after ?TIMEOUT ->
-            {error, timeout}
-    end;
-do_request(Method, Params, []) ->
-    betfair_connection:request(betfair_rpc:new(Method, Params)).
+-spec credentials() -> [any()].
+credentials() ->
+    get_env(credentials).
+
+-spec domain(atom()) -> string().
+domain(identity) ->
+    get_env(identity_endpoint);
+domain(exchange) ->
+    get_env(exchange_endpoint).
+
+-spec get_env(atom()) -> list() | undefined.
+get_env(Key) ->
+    gproc:get_env(?SCOPE, ?MODULE, Key, [os_env, app_env]).
+
+-spec get_env_bin(atom()) -> list() | undefined.
+get_env_bin(Key) ->
+    case get_env(Key) of
+        Val when is_list(Val) ->
+            list_to_binary(Val);
+        Nope ->
+            Nope
+    end.
+
+-spec get_env(atom(), any()) -> string() | undefined.
+get_env(Key, Default) ->
+    gproc:get_env(?SCOPE, ?MODULE, Key, [os_env, app_env, {default, Default}]).

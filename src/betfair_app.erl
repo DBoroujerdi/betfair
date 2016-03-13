@@ -16,11 +16,11 @@
 start(_, _) ->
     _ = lager:info("Starting.."),
     Opts = betfair:get_opts(),
+
     ok = check_opts(Opts),
     ok = betfair_session_token_store:new(),
-    ok = setup_session(Opts),
 
-    betfair_sup:start_link(Opts).
+    betfair_sup:start_link().
 
 stop(_) ->
     ok.
@@ -51,11 +51,8 @@ check_opts([{exchange_endpoint, Opt}|Rest]) when is_list(Opt) ->
     check_opts(Rest);
 check_opts([{included_applications, _Opt}|Rest]) ->
     check_opts(Rest);
+check_opts([{app_key, _Opt}|Rest]) ->
+    check_opts(Rest);
 
 check_opts([]) ->
     ok.
-
--spec setup_session(list(tuple())) -> ok.
-setup_session(Opts) ->
-    {ok, SessionToken} = betfair_session:new_session(Opts),
-    betfair_session_token_store:update_token(SessionToken).

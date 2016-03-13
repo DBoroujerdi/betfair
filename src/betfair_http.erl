@@ -9,10 +9,14 @@
 %% Api Functions
 %%------------------------------------------------------------------------------
 
--spec url_encode(map()) -> binary().
-url_encode(Params) ->
-    url_encode(lists:map(fun to_binary/1, maps:to_list(Params)), <<>>).
+-spec url_encode(MatrixParams) -> binary() when
+      MatrixParams :: map() | [any()].
+url_encode(Params) when is_list(Params) ->
+    url_encode(lists:map(fun to_binary/1, Params), <<>>);
+url_encode(Params) when is_map(Params) ->
+    url_encode(maps:to_list(Params)).
 
+-spec url_encode([{binary(), binary()}], binary()) -> binary().
 url_encode([{K, V}|[]], Acc) ->
     <<Acc/binary, K/binary, "=", V/binary>>;
 url_encode([{K, V}|Tail], Acc) ->
@@ -23,9 +27,9 @@ url_encode([{K, V}|Tail], Acc) ->
 hdr(Key, Val) when is_binary(Key) and is_list(Val) ->
     {Key, Val}.
 
--spec handle_status(integer(), any()) ->
-                           {atom(), {status, integer}} |
-                           {atom(), {status, integer}, {headers | any()}}.
+-spec handle_status(integer(), any()) -> Response when
+      Response :: {atom(), {status, integer}} |
+                  {atom(), {status, integer}, {headers | any()}}.
 handle_status(Status, Headers) when Status >= 500 ->
     {server_error, {status, Status}, {headers, Headers}};
 handle_status(Status, _) when Status >= 400 ->

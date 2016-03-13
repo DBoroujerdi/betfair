@@ -3,7 +3,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/1]).
+-export([start_link/0]).
 
 -export([supervisor/1]).
 -export([supervisor/2]).
@@ -25,18 +25,17 @@
 %% API functions
 %%------------------------------------------------------------------------------
 
-start_link(Opts) ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, [Opts]).
+start_link() ->
+    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 
 %%------------------------------------------------------------------------------
 %% Supervisor callbacks
 %%------------------------------------------------------------------------------
 
-init([Opts]) ->
-    ResponseSup = supervisor(betfair_response_processor_sup, permanent, [Opts]),
-    ConnectionSup = supervisor(betfair_connection_sup, permanent, []),
-    {ok, {{one_for_one, 5, 10}, [ResponseSup, ConnectionSup]}}.
+init([]) ->
+    StreamSup = supervisor(betfair_stream_sup, permanent, []),
+    {ok, {{one_for_one, 5, 10}, [StreamSup]}}.
 
 
 %%------------------------------------------------------------------------------

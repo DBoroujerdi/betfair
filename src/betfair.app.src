@@ -11,6 +11,7 @@
     ssl,
     gproc,
     lager,
+    jsx,
     gun
    ]},
   {env,[]},
