@@ -18,7 +18,6 @@ start(_, _) ->
     Opts = betfair:get_opts(),
 
     ok = check_opts(Opts),
-    ok = betfair_session_token_store:new(),
 
     betfair_sup:start_link().
 
