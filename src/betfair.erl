@@ -5,6 +5,8 @@
          get_opts/0,
          prop/1,
          new_session/0,
+         new_stream/1,
+         close_stream/1,
          subscribe/2,
          unsubscribe/2,
          request/2,
@@ -42,18 +44,20 @@ get_opts() ->
 prop(Name) ->
     proplists:get_value(Name, get_opts()).
 
--spec subscribe(binary(), binary()) -> {ok, pid()} | {error, term()}.
-subscribe(Market, Token) ->
-    case betfair_stream_sup:start_stream(Market, Token) of
-        {error, _} = Error ->
-            Error;
-        Ok ->
-            _ = gproc_ps:subscribe(?SCOPE, {market_update, Market}),
-            Ok
-    end.
+-spec new_stream(binary()) -> {ok, pid()} | {error, term()}.
+new_stream(Token) ->
+    betfair_stream_sup:start_stream(Token).
 
-unsubscribe(_Pid, _Market) ->
-    ok.
+close_stream(Stream) ->
+    supervisor:terminate_child(betfair_stream_sup, Stream).
+
+-spec subscribe(pid(), binary()) -> ok.
+subscribe(Stream, Market) ->
+    betfair_stream:add_market(Stream, Market).
+
+-spec unsubscribe(pid(), binary()) -> ok | {error, term()}.
+unsubscribe(Stream, Market) ->
+    betfair_stream:remove_market(Stream, Market).
 
 -spec new_session() -> {ok, binary()} | {error, term()}.
 new_session() ->

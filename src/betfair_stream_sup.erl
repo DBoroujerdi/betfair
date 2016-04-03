@@ -4,7 +4,7 @@
 
 %% API
 -export([start_link/0,
-         start_stream/2]).
+         start_stream/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -19,15 +19,8 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
--spec start_stream(binary(), binary()) -> {ok, pid()} | {error, term()}.
-start_stream(MarketId, Token) ->
-    case supervisor:start_child(?SERVER, [MarketId, Token, self()]) of
-        {ok, _P} = Pid -> Pid;
-        {error, {already_started, Pid}} ->
-            ok = betfair_stream:add_market(Pid, MarketId),
-            {ok, Pid};
-        {error, _Reason} = Error -> Error
-    end.
+start_stream(Token) ->
+    supervisor:start_child(?SERVER, [Token, self()]).
 
 
 %%------------------------------------------------------------------------------

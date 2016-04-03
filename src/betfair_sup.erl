@@ -35,7 +35,8 @@ start_link() ->
 
 init([]) ->
     StreamSup = supervisor(betfair_stream_sup, permanent, []),
-    {ok, {{one_for_one, 5, 10}, [StreamSup]}}.
+    Publisher = worker(betfair_pub, permanent, []),
+    {ok, {{one_for_one, 5, 10}, [StreamSup, Publisher]}}.
 
 
 %%------------------------------------------------------------------------------
